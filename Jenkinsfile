@@ -14,14 +14,6 @@ pipeline {
             }
         }
         
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    docker.build("${DOCKER_IMAGE_NAME}:${DOCKER_TAG}")
-                }
-            }
-        }
-        
         stage('Unit Tests') {
             steps {
                 script {
@@ -30,6 +22,14 @@ pipeline {
                         npm install
                         npm test
                     """
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh "docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ."
                 }
             }
         }
@@ -66,9 +66,11 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'DockerHubID') {
-                        docker.image("${DOCKER_IMAGE_NAME}:${DOCKER_TAG}").push()
-                    }
+                    sh """
+                        echo \$DOCKER_HUB_CREDENTIALS_PSW | docker login -u \$DOCKER_HUB_CREDENTIALS_USR --password-stdin
+                        docker push ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
+                        docker logout
+                    """
                 }
             }
         }
