@@ -40,8 +40,9 @@ pipeline {
                     // Verify Docker images were built successfully
                     sh "docker images | grep ${DOCKER_IMAGE_NAME}"
                     
-                    // Generate unique container name to avoid conflicts
+                    // Generate unique container name and port to avoid conflicts
                     def containerName = "test-container-${env.BUILD_NUMBER}-${env.BUILD_ID}"
+                    def testPort = 3000 + (env.BUILD_NUMBER as Integer) % 1000
                     
                     // Clean up any existing containers with the same name pattern
                     sh """
@@ -54,15 +55,15 @@ pipeline {
                     
                     // Test the Docker image by running it temporarily
                     sh """
-                        echo "Testing Docker container..."
-                        docker run -d --name ${containerName} -p 3001:8082 ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
+                        echo "Testing Docker container on port ${testPort}..."
+                        docker run -d --name ${containerName} -p ${testPort}:8082 ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
                         sleep 10
                         
                         # Verify container is running
                         docker ps | grep ${containerName} || echo "Container not found in running state"
                         
                         # Test if application responds (basic health check)
-                        curl -f http://localhost:3001 || echo "Application not responding on port 3001"
+                        curl -f http://localhost:${testPort} || echo "Application not responding on port ${testPort}"
                         
                         # Check container logs
                         docker logs ${containerName} || echo "Could not retrieve logs"
@@ -99,6 +100,10 @@ pipeline {
                     
                     # Clean up containers created by this build
                     docker ps -a --filter "name=test-container-" --format "{{.Names}}" | xargs -r docker rm -f 2>/dev/null || true
+                    
+                    # Kill any processes using ports in our test range (3000-3999) - optional extra safety
+                    # Uncomment if you want aggressive port cleanup (be careful on shared systems)
+                    # for port in {3000..3010}; do fuser -k ${port}/tcp 2>/dev/null || true; done
                     
                     # General Docker cleanup
                     docker system prune -f
