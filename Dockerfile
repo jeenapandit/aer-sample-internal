@@ -6,5 +6,7 @@ COPY . /app/
 WORKDIR /app
 # Install dependencies.
 RUN npm install
+# Expose the port the app runs on
+EXPOSE 8082
 # Start the Express app
 CMD ["node", "server.js"]
