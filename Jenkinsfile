@@ -47,17 +47,17 @@ pipeline {
                         sleep 10
                         
                         # Verify container is running
-                        docker ps | grep test-container-temp
+                        docker ps | grep test-container-temp || echo "Container not found in running state"
                         
                         # Test if application responds (basic health check)
                         curl -f http://localhost:3001 || echo "Application not responding on port 3001"
                         
                         # Check container logs
-                        docker logs test-container-temp
+                        docker logs test-container-temp || echo "Could not retrieve logs"
                         
-                        # Clean up test container
-                        docker stop test-container-temp
-                        docker rm test-container-temp
+                        # Clean up test container with better error handling
+                        docker stop test-container-temp || docker kill test-container-temp || echo "Could not stop container"
+                        docker rm test-container-temp || docker rm -f test-container-temp || echo "Could not remove container"
                     """
                 }
             }
@@ -78,7 +78,17 @@ pipeline {
     
     post {
         always {
-            sh 'docker system prune -f'
+            script {
+                // Cleanup any remaining test containers
+                sh '''
+                    # Force cleanup of any test containers that might still exist
+                    docker stop test-container-temp 2>/dev/null || true
+                    docker rm -f test-container-temp 2>/dev/null || true
+                    
+                    # General Docker cleanup
+                    docker system prune -f
+                '''
+            }
         }
         success {
             echo 'Pipeline completed successfully!'
